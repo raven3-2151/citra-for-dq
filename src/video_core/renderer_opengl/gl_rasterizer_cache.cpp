@@ -28,6 +28,9 @@
 #include "video_core/texture/texture_decode.h"
 #include "video_core/utils.h"
 #include "video_core/video_core.h"
+#include "common/string_util.h"
+#include "core/hle/kernel/process.h"
+
 
 using SurfaceType = SurfaceParams::SurfaceType;
 using PixelFormat = SurfaceParams::PixelFormat;
@@ -948,8 +951,17 @@ SurfaceSurfaceRect_Tuple RasterizerCacheOpenGL::GetFramebufferSurfaces(
     }
 
     if (color_surface != nullptr) {
-        //ValidateSurface(color_surface, boost::icl::first(color_vp_interval), boost::icl::length(color_vp_interval));
+               std::string str = Common::StringFromFormat("%lld", Kernel::g_current_process->codeset->program_id);
+               unsigned long num = stoull(str);
+                    switch (num) {
+                         // DragonQuest XI JPN  -  Title ID: 0004000000199200 (decimal num: 1125899908518400)
+                         case 1125899908518400:
+                              break;
+                         default:
+                              ValidateSurface(color_surface, boost::icl::first(color_vp_interval), boost::icl::length(color_vp_interval));
+                         }
     }
+
     if (depth_surface != nullptr) {
         ValidateSurface(depth_surface, boost::icl::first(depth_vp_interval), boost::icl::length(depth_vp_interval));
     }
@@ -1046,32 +1058,40 @@ void RasterizerCacheOpenGL::ValidateSurface(const Surface& surface, PAddr addr, 
         if (match_surface != nullptr) {
             if (!match_surface->CanSubRect(params)) {
                 // Need to call CopySurface and possibly create a new one first, which GetSurface will do for us
-                if (params.GetInterval() == surface->GetInterval()) {
-                    CopySurface(match_surface, surface);
-                    surface->invalid_regions.clear();
-                    return;
-                }
-                Surface tmp_surface = GetSurface(params, ScaleMatch::Upscale, false);
-                if (tmp_surface != nullptr) {
-                    CopySurface(match_surface, tmp_surface);
-                    tmp_surface->invalid_regions.erase(params.GetInterval());
-                    match_surface = tmp_surface;
-                }
-            }
+                    if (params.GetInterval() == surface->GetInterval()) {
+                         CopySurface(match_surface, surface);
+                         surface->invalid_regions.clear();
+                         return;
+                    }
+                    Surface tmp_surface = GetSurface(params, ScaleMatch::Upscale, false);
+                    if (tmp_surface != nullptr) {
+                         CopySurface(match_surface, tmp_surface);
+                         tmp_surface->invalid_regions.erase(params.GetInterval());
+                         match_surface = tmp_surface;
+                    }
+               }
 
-            ASSERT(match_surface->CanSubRect(params));
-            const auto src_rect = match_surface->GetScaledSubRect(params);
-            const auto dest_rect = surface->GetScaledSubRect(params);
+               ASSERT(match_surface->CanSubRect(params));
+               const auto src_rect = match_surface->GetScaledSubRect(params);
+               const auto dest_rect = surface->GetScaledSubRect(params);
 
-            BlitSurfaces(match_surface, src_rect, surface, dest_rect);
-            surface->gl_buffer_dirty = true;
+               BlitSurfaces(match_surface, src_rect, surface, dest_rect);
+               surface->gl_buffer_dirty = true;
 
-            surface->invalid_regions.erase(params.GetInterval());
-            continue;
-        }
+               surface->invalid_regions.erase(params.GetInterval());
+               continue;
+          }
 
-        // Load data from 3DS memory
-        //FlushRegion(interval_start, interval_end - interval_start);
+          // Load data from 3DS memory
+          std::string str = Common::StringFromFormat("%lld", Kernel::g_current_process->codeset->program_id);
+          unsigned long num = stoull(str);
+          switch (num) {
+          // DragonQuest XI JPN  -  Title ID: 0004000000199200 (decimal num: 1125899908518400)
+               case 1125899908518400:
+                    break;
+               default:
+                    FlushRegion(interval_start, interval_end - interval_start);
+     }
         surface->DownloadGLTexture();
         surface->LoadGLBuffer(interval_start, interval_end);
         upload_texture = true;
